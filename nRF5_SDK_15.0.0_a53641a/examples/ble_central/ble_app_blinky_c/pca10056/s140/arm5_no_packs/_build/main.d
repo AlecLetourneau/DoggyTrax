@@ -77,7 +77,6 @@
 .\_build\main.o: ..\..\..\..\..\..\components\ble\ble_services\ble_lbs_c\ble_lbs_c.h
 .\_build\main.o: ..\..\..\..\..\..\components\ble\nrf_ble_gatt\nrf_ble_gatt.h
 .\_build\main.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log.h
-.\_build\main.o: ..\..\..\..\..\..\components\libraries\strerror\nrf_strerror.h
 .\_build\main.o: ..\..\..\..\..\..\components\libraries\experimental_log\src\nrf_log_internal.h
 .\_build\main.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_instance.h
 .\_build\main.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_types.h

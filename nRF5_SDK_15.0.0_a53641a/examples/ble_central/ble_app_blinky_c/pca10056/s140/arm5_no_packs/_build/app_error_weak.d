@@ -29,7 +29,6 @@
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\libraries\util\sdk_macros.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\libraries\util\nrf_assert.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\libraries\experimental_section_vars\nrf_section.h
-.\_build\app_error_weak.o: ..\..\..\..\..\..\components\libraries\strerror\nrf_strerror.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\libraries\experimental_log\src\nrf_log_internal.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_instance.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_types.h
@@ -44,5 +43,6 @@
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\softdevice\s140\headers\nrf_svc.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\softdevice\s140\headers\nrf_error_soc.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\softdevice\s140\headers\nrf_nvic.h
+.\_build\app_error_weak.o: ..\..\..\..\..\..\components\libraries\strerror\nrf_strerror.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\softdevice\s140\headers\nrf_sdm.h
 .\_build\app_error_weak.o: ..\..\..\..\..\..\components\softdevice\s140\headers\nrf_error_sdm.h

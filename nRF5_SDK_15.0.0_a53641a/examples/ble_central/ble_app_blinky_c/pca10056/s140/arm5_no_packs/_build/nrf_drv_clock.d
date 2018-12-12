@@ -54,7 +54,6 @@
 .\_build\nrf_drv_clock.o: ..\..\..\..\..\..\components\libraries\util\sdk_os.h
 .\_build\nrf_drv_clock.o: ..\..\..\..\..\..\components\libraries\util\sdk_macros.h
 .\_build\nrf_drv_clock.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log.h
-.\_build\nrf_drv_clock.o: ..\..\..\..\..\..\components\libraries\strerror\nrf_strerror.h
 .\_build\nrf_drv_clock.o: ..\..\..\..\..\..\components\libraries\experimental_log\src\nrf_log_internal.h
 .\_build\nrf_drv_clock.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_instance.h
 .\_build\nrf_drv_clock.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_types.h

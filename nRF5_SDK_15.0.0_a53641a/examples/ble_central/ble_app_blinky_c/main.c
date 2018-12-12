@@ -74,9 +74,10 @@
 #define CENTRAL_CONNECTED_LED           BSP_BOARD_LED_1                     /**< Connected LED will be on when the device is connected. */
 #define LEDBUTTON_LED                   BSP_BOARD_LED_2                     /**< LED to indicate a change of state of the the Button characteristic on the peer. */
 
-#define SCAN_INTERVAL                   0x00A0                              /**< Determines scan interval in units of 0.625 millisecond. */
+#define SCAN_INTERVAL                   0x0010                              /**< Determines scan interval in units of 0.625 millisecond. */
 #define SCAN_WINDOW                     0x0050                              /**< Determines scan window in units of 0.625 millisecond. */
-#define SCAN_DURATION                   0x0000                              /**< Timout when scanning. 0x0000 disables timeout. */
+#define SCAN_DURATION                   0x05                                /**< Timout when scanning. 0x0000 disables timeout. */
+//scan for 50 ms then timeout
 
 #define MIN_CONNECTION_INTERVAL         MSEC_TO_UNITS(7.5, UNIT_1_25_MS)    /**< Determines minimum connection interval in milliseconds. */
 #define MAX_CONNECTION_INTERVAL         MSEC_TO_UNITS(30, UNIT_1_25_MS)     /**< Determines maximum connection interval in milliseconds. */
@@ -89,27 +90,56 @@
 #define APP_BLE_CONN_CFG_TAG            1                                   /**< A tag identifying the SoftDevice BLE configuration. */
 #define APP_BLE_OBSERVER_PRIO           3                                   /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 
-#define APP_ADV_INTERVAL                64                                      /**< The advertising interval (in units of 0.625 ms; this value corresponds to 40 ms). */
-#define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED   /**< The advertising time-out (in units of seconds). When set to 0, we will never time out. */
+#define APP_ADV_INTERVAL_PING           32                                  /**< The advertising interval (in units of 0.625 ms; this value corresponds to 40 ms). */
+#define APP_ADV_DURATION_PING           1                                   /**< The advertising time-out (in units of 10 milliseconds). When set to 0, we will never time out. */
+//Ping once then time out
+
+#define APP_ADV_INTERVAL_REP            32                                 /**< The advertising interval (in units of 0.625 ms; this value corresponds to 20 ms). */
+#define APP_ADV_DURATION_REP            100                                  /**< The advertising time-out (in units of 10 milliseconds). When set to 0, we will never time out. */
+//Report every 20 ms 5 times
 
 #define ADV_IDENTIFIER                  0x54524158                          //TRAX ascii to hex
+#define MAX_DEVICES_SUPPORTED           4
 
 BLE_LBS_C_DEF(m_ble_lbs_c);                                     /**< Main structure used by the LBS client module. */
 NRF_BLE_GATT_DEF(m_gatt);                                       /**< GATT module instance. */
 BLE_DB_DISCOVERY_DEF(m_db_disc);                                /**< DB discovery module instance. */
 
-static app_timer_t adv_timer;
+typedef struct{
+  uint8_t addr[6];
+  int8_t rssi;
+}beacon_entry_t;
 
-static char const m_target_periph_name[] = "Nordic_Blinky";     /**< Name of the device we try to connect to. This name is searched in the scan report data*/
+static beacon_entry_t devices_found[MAX_DEVICES_SUPPORTED];
 
 static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;                   /**< Advertising handle used to identify an advertising set. */
-static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];                    /**< Buffer for storing an encoded advertising set. */
+static uint8_t m_enc_advdata_ping[BLE_GAP_ADV_SET_DATA_SIZE_MAX];                    /**< Buffer for storing an encoded advertising set. */
+static ble_gap_adv_params_t m_adv_params_ping;
 
-static ble_gap_adv_data_t m_adv_data =
+static ble_gap_adv_data_t m_adv_data_ping =
 {
     .adv_data =
     {
-        .p_data = m_enc_advdata,
+        .p_data = m_enc_advdata_ping,
+        .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
+    },
+    .scan_rsp_data =
+    {
+        .p_data = NULL,
+        .len    = (0)
+
+    }
+};
+
+//static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;                   /**< Advertising handle used to identify an advertising set. */
+static uint8_t m_enc_advdata_rep[BLE_GAP_ADV_SET_DATA_SIZE_MAX];                    /**< Buffer for storing an encoded advertising set. */
+static ble_gap_adv_params_t m_adv_params_rep;
+
+static ble_gap_adv_data_t m_adv_data_rep =
+{
+    .adv_data =
+    {
+        .p_data = m_enc_advdata_rep,
         .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
     },
     .scan_rsp_data =
@@ -138,51 +168,71 @@ static uint8_t m_scan_buffer_data[BLE_GAP_SCAN_BUFFER_MAX]; /**< buffer where ad
 static ble_data_t m_scan_buffer =
 {
     m_scan_buffer_data,
-    BLE_GAP_SCAN_BUFFER_MIN
+    BLE_GAP_SCAN_BUFFER_MAX
 };
 
-/**@brief Connection parameters requested for connection. */
-static ble_gap_conn_params_t const m_connection_param =
+static void update_device_list(ble_gap_addr_t address, int8_t rssi)
 {
-    (uint16_t)MIN_CONNECTION_INTERVAL,
-    (uint16_t)MAX_CONNECTION_INTERVAL,
-    (uint16_t)SLAVE_LATENCY,
-    (uint16_t)SUPERVISION_TIMEOUT
-};
+  //NRF_LOG_HEXDUMP_INFO(address.addr, sizeof(address.addr));
+  uint8_t empty_address[6] = {0};
+  for(int i=0; i<MAX_DEVICES_SUPPORTED; i++)
+  {
+    if (memcmp(address.addr, devices_found[i].addr, 6) == 0)
+    {
+      if (devices_found[i].rssi < rssi)
+      {
+        devices_found[i].rssi = rssi;
+      }
+      return;
+    }
+    if (memcmp(devices_found[i].addr, empty_address, 6) == 0)
+    {
+      memcpy(devices_found[i].addr, address.addr, 6);
+      devices_found[i].rssi = rssi;
+      return;
+    }
+  }
+  //NRF_LOG_DEBUG("Can't add new device. Buffer Full");
+  return;
+}
+
+static void clear_device_strengths()
+{
+  for(int i=0; i<MAX_DEVICES_SUPPORTED; i++)
+  {
+    devices_found[i].rssi = 0x80;
+  }
+}
 
 /**@brief Function for initializing the Advertising functionality.
  *
  * @details Encodes the required advertising data and passes it to the stack.
  *          Also builds a structure to be passed to the stack when starting advertising.
  */
-static void advertising_init(void)
+static void ping_advertising_init(void)
 {
     ret_code_t    err_code;
     uint8_t adata[31];
     memset(adata, 0x00, sizeof(adata));
-    adata[0] = 30;
-    adata[1] = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
+    adata[0] = 5;
+    adata[1] = 9;
     adata[2] = 0x54; //T
     adata[3] = 0x52; //R
     adata[4] = 0x41; //A
     adata[5] = 0x58; //X
     
-    m_adv_data.adv_data.p_data = adata;
-    m_adv_data.adv_data.len = BLE_GAP_ADV_SET_DATA_SIZE_MAX;
+    m_adv_data_ping.adv_data.p_data = adata;
+    m_adv_data_ping.adv_data.len = 6;
+  
+    memset(&m_adv_params_ping, 0, sizeof(m_adv_params_ping));
+    m_adv_params_ping.primary_phy     = BLE_GAP_PHY_1MBPS;
+    m_adv_params_ping.duration        = APP_ADV_DURATION_PING;
+    m_adv_params_ping.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
+    m_adv_params_ping.p_peer_addr     = NULL;
+    m_adv_params_ping.filter_policy   = BLE_GAP_ADV_FP_ANY;
+    m_adv_params_ping.interval        = APP_ADV_INTERVAL_PING;
 
-    ble_gap_adv_params_t adv_params;
-
-    // Set advertising parameters.
-    memset(&adv_params, 0, sizeof(adv_params));
-
-    adv_params.primary_phy     = BLE_GAP_PHY_1MBPS;
-    adv_params.duration        = APP_ADV_DURATION;
-    adv_params.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
-    adv_params.p_peer_addr     = NULL;
-    adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY;
-    adv_params.interval        = APP_ADV_INTERVAL;
-
-    err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
+    err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data_ping, &m_adv_params_ping);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -192,32 +242,35 @@ static void report_advertising_init(void)
     uint8_t adata[31];
     memset(adata, 0x00, sizeof(adata));
     adata[0] = 30;
-    adata[1] = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
+    adata[1] = 0x23;
     adata[2] = 0x52; //R
-    adata[3] = 0x45; //E
-    adata[4] = 0x50; //P
-    adata[5] = 0x4F; //O
+    memcpy((uint8_t *)&adata[3], (uint8_t *)&devices_found[0], 7);
+    memcpy((uint8_t *)&adata[10], (uint8_t *)&devices_found[1], 7);
+    memcpy((uint8_t *)&adata[17], (uint8_t *)&devices_found[2], 7);
+    memcpy((uint8_t *)&adata[24], (uint8_t *)&devices_found[3], 7);
+    //NRF_LOG_HEXDUMP_INFO(adata, sizeof(adata));
     
-    m_adv_data.adv_data.p_data = adata;
-    m_adv_data.adv_data.len = BLE_GAP_ADV_SET_DATA_SIZE_MAX;
+    memcpy(m_enc_advdata_rep, adata, sizeof(adata));
+    m_adv_data_rep.adv_data.p_data = m_enc_advdata_rep;
+    m_adv_data_rep.adv_data.len = BLE_GAP_ADV_SET_DATA_SIZE_MAX;
 
-    ble_gap_adv_params_t adv_params;
+    memset(&m_adv_params_rep, 0, sizeof(m_adv_params_rep));
+    m_adv_params_rep.primary_phy     = BLE_GAP_PHY_1MBPS;
+    m_adv_params_rep.duration        = APP_ADV_DURATION_REP;
+    m_adv_params_rep.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
+    m_adv_params_rep.p_peer_addr     = NULL;
+    m_adv_params_rep.filter_policy   = BLE_GAP_ADV_FP_ANY;
+    m_adv_params_rep.interval        = APP_ADV_INTERVAL_REP;
 
-    // Set advertising parameters.
-    memset(&adv_params, 0, sizeof(adv_params));
-
-    adv_params.primary_phy     = BLE_GAP_PHY_1MBPS;
-    adv_params.duration        = APP_ADV_DURATION;
-    adv_params.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
-    adv_params.p_peer_addr     = NULL;
-    adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY;
-    adv_params.interval        = 16; //10ms
-
-    err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
+    err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data_rep, &m_adv_params_rep);
     APP_ERROR_CHECK(err_code);
+    
+    clear_device_strengths();
 }
 
 /**@brief Function for starting advertising.
+Called every ping transmission.
+Called once per report.
  */
 static void advertising_start(void)
 {
@@ -227,20 +280,50 @@ static void advertising_start(void)
     APP_ERROR_CHECK(err_code);
 }
 
-void adv_timer_event_handler(nrf_timer_event_t event_type, void* p_context)
+/**@brief Function to start scanning.
+ */
+static void scan_start(void)
 {
-  static bool isReporting = false;
-  if (isReporting)
+    ret_code_t err_code;
+
+    (void) sd_ble_gap_scan_stop();
+
+    err_code = sd_ble_gap_scan_start(&m_scan_params, &m_scan_buffer);
+    APP_ERROR_CHECK(err_code);
+}
+
+static void fsm_scan_timed_out(void)
+{
+  //When scan times out, increment counter and check whether to send ping or report
+  static uint8_t ping_count = 0;
+  //NRF_LOG_DEBUG("In fsm_scan_timed_out. ping_count = %d", ping_count);
+  if(ping_count >= 5)
   {
-    advertising_init();
-    //set timer for 450 ms
-    app_timer_start(&adv_timer, APP_TIMER_TICKS(450), NULL);
-  } else {
+    //send report
+    //NRF_LOG_HEXDUMP_INFO(devices_found, sizeof(devices_found));
     report_advertising_init();
-    //set timer for 50 ms
-    app_timer_start(&adv_timer, APP_TIMER_TICKS(50), NULL);
-  }  
-  isReporting = !isReporting;
+    advertising_start();
+    ping_count = 0;
+  }
+  else if(ping_count == 0)
+  {
+    //start pinging, increment count
+    ping_advertising_init();
+    advertising_start();
+    ping_count++;
+  }
+  else 
+  {
+    //continue pinging, increment count
+    advertising_start();
+    ping_count++;
+  }
+}
+
+static void fsm_adv_timed_out(void)
+{
+  //when ping advertising times out, start scan
+  scan_start();
 }
 
 /**@brief Function to handle asserts in the SoftDevice.
@@ -270,66 +353,16 @@ static void leds_init(void)
 }
 
 
-/**@brief Function to start scanning.
- */
-static void scan_start(void)
-{
-    ret_code_t err_code;
-
-    (void) sd_ble_gap_scan_stop();
-
-    err_code = sd_ble_gap_scan_start(&m_scan_params, &m_scan_buffer);
-    APP_ERROR_CHECK(err_code);
-
-    bsp_board_led_off(CENTRAL_CONNECTED_LED);
-    bsp_board_led_on(CENTRAL_SCANNING_LED);
-}
-
-
 /**@brief Handles events coming from the LED Button central module.
  */
 static void lbs_c_evt_handler(ble_lbs_c_t * p_lbs_c, ble_lbs_c_evt_t * p_lbs_c_evt)
 {
-    switch (p_lbs_c_evt->evt_type)
-    {
-        case BLE_LBS_C_EVT_DISCOVERY_COMPLETE:
-        {
-            ret_code_t err_code;
-
-            err_code = ble_lbs_c_handles_assign(&m_ble_lbs_c,
-                                                p_lbs_c_evt->conn_handle,
-                                                &p_lbs_c_evt->params.peer_db);
-            NRF_LOG_INFO("LED Button service discovered on conn_handle 0x%x.", p_lbs_c_evt->conn_handle);
-
-            err_code = app_button_enable();
-            APP_ERROR_CHECK(err_code);
-
-            // LED Button service discovered. Enable notification of Button.
-            err_code = ble_lbs_c_button_notif_enable(p_lbs_c);
-            APP_ERROR_CHECK(err_code);
-        } break; // BLE_LBS_C_EVT_DISCOVERY_COMPLETE
-
-        case BLE_LBS_C_EVT_BUTTON_NOTIFICATION:
-        {
-            NRF_LOG_INFO("Button state changed on peer to 0x%x.", p_lbs_c_evt->params.button.button_state);
-            if (p_lbs_c_evt->params.button.button_state)
-            {
-                bsp_board_led_on(LEDBUTTON_LED);
-            }
-            else
-            {
-                bsp_board_led_off(LEDBUTTON_LED);
-            }
-        } break; // BLE_LBS_C_EVT_BUTTON_NOTIFICATION
-
-        default:
-            // No implementation needed.
-            break;
-    }
 }
 
 /**@brief Function for handling the advertising report BLE event.
  *
+  Logs ping packets from Doggy Trax devices and continues scanning.
+
  * @param[in] p_adv_report  Advertising report from the SoftDevice.
  */
 static void on_adv_report(ble_gap_evt_adv_report_t const * p_adv_report)
@@ -338,20 +371,27 @@ static void on_adv_report(ble_gap_evt_adv_report_t const * p_adv_report)
 
     ble_gap_addr_t addr = p_adv_report->peer_addr;
     char address_string[20];
-//    if(p_adv_report->data.p_data[2] != 'T' || p_adv_report->data.p_data[3] != 'R'
-//      || p_adv_report->data.p_data[4] != 'A' || p_adv_report->data.p_data[5] != 'X')
-//    {
+    if((p_adv_report->data.p_data[2] != 0x52 && p_adv_report->data.p_data[2] != 0x54) ||
+      (p_adv_report->data.len != 6 && p_adv_report->data.len != 31))
+    {
+        //ignore packet
         err_code = sd_ble_gap_scan_start(NULL, &m_scan_buffer);
         APP_ERROR_CHECK(err_code);
         return;
-//    }
+    }
+    //process packet
     sprintf(address_string, "%02X:%02X:%02X:%02X:%02X:%02X",
                  addr.addr[5], addr.addr[4], addr.addr[3], addr.addr[2],
                  addr.addr[1], addr.addr[0]);
-    NRF_LOG_INFO("Packet Received, address: %s, signal strength: %d Packet Data:", 
-    address_string, p_adv_report->rssi);
-    NRF_LOG_HEXDUMP_INFO(p_adv_report->data.p_data, p_adv_report->data.len);
-    NRF_LOG_FLUSH();
+    //NRF_LOG_INFO("Packet Received, address: %s, signal strength: %d Packet Data:", 
+    //address_string, p_adv_report->rssi);
+//    if(p_adv_report->data.p_data[0] == 0x52 && p_adv_report->data.len == 31)
+//    {
+//        NRF_LOG_HEXDUMP_INFO(p_adv_report->data.p_data, p_adv_report->data.len);
+//    }
+//    NRF_LOG_FLUSH();
+    
+    update_device_list(p_adv_report->peer_addr, p_adv_report->rssi);
 
     err_code = sd_ble_gap_scan_start(NULL, &m_scan_buffer);
     APP_ERROR_CHECK(err_code);
@@ -365,38 +405,13 @@ static void on_adv_report(ble_gap_evt_adv_report_t const * p_adv_report)
  */
 static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
-    ret_code_t err_code;
+    //ret_code_t err_code;
 
     // For readability.
     ble_gap_evt_t const * p_gap_evt = &p_ble_evt->evt.gap_evt;
 
     switch (p_ble_evt->header.evt_id)
     {
-        // Upon connection, check which peripheral has connected (HR or RSC), initiate DB
-        // discovery, update LEDs status and resume scanning if necessary. */
-        case BLE_GAP_EVT_CONNECTED:
-        {
-            NRF_LOG_INFO("Connected.");
-            err_code = ble_lbs_c_handles_assign(&m_ble_lbs_c, p_gap_evt->conn_handle, NULL);
-            APP_ERROR_CHECK(err_code);
-
-            err_code = ble_db_discovery_start(&m_db_disc, p_gap_evt->conn_handle);
-            APP_ERROR_CHECK(err_code);
-
-            // Update LEDs status, and check if we should be looking for more
-            // peripherals to connect to.
-            bsp_board_led_on(CENTRAL_CONNECTED_LED);
-            bsp_board_led_off(CENTRAL_SCANNING_LED);
-        } break;
-
-        // Upon disconnection, reset the connection handle of the peer which disconnected, update
-        // the LEDs status and start scanning again.
-        case BLE_GAP_EVT_DISCONNECTED:
-        {
-            NRF_LOG_INFO("Disconnected.");
-            scan_start();
-        } break;
-
         case BLE_GAP_EVT_ADV_REPORT:
         {
             on_adv_report(&p_gap_evt->params.adv_report);
@@ -405,50 +420,20 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
         case BLE_GAP_EVT_TIMEOUT:
         {
             // We have not specified a timeout for scanning, so only connection attemps can timeout.
-            if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
+            if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN)
             {
-                NRF_LOG_DEBUG("Connection request timed out.");
+                //NRF_LOG_DEBUG("Scan timed out.");
+                fsm_scan_timed_out();
             }
         } break;
-
-        case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
+        
+        case BLE_GAP_EVT_ADV_SET_TERMINATED:
         {
-            // Accept parameters requested by peer.
-            err_code = sd_ble_gap_conn_param_update(p_gap_evt->conn_handle,
-                                        &p_gap_evt->params.conn_param_update_request.conn_params);
-            APP_ERROR_CHECK(err_code);
+          //NRF_LOG_DEBUG("Advertising Timed Out. Advertisements: %d", 
+            //p_gap_evt->params.adv_set_terminated.num_completed_adv_events);
+          fsm_adv_timed_out();
         } break;
-
-        case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
-        {
-            NRF_LOG_DEBUG("PHY update request.");
-            ble_gap_phys_t const phys =
-            {
-                .rx_phys = BLE_GAP_PHY_AUTO,
-                .tx_phys = BLE_GAP_PHY_AUTO,
-            };
-            err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
-            APP_ERROR_CHECK(err_code);
-        } break;
-
-        case BLE_GATTC_EVT_TIMEOUT:
-        {
-            // Disconnect on GATT Client timeout event.
-            NRF_LOG_DEBUG("GATT Client Timeout.");
-            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
-                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-            APP_ERROR_CHECK(err_code);
-        } break;
-
-        case BLE_GATTS_EVT_TIMEOUT:
-        {
-            // Disconnect on GATT Server timeout event.
-            NRF_LOG_DEBUG("GATT Server Timeout.");
-            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
-                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-            APP_ERROR_CHECK(err_code);
-        } break;
-
+        
         default:
             // No implementation needed.
             break;
@@ -495,6 +480,7 @@ static void ble_stack_init(void)
     NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
 
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, 4);
+    sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, 4);
 }
 
 
@@ -519,7 +505,7 @@ static void button_event_handler(uint8_t pin_no, uint8_t button_action)
             }
             if (err_code == NRF_SUCCESS)
             {
-                NRF_LOG_INFO("LBS write LED state %d", button_action);
+                //NRF_LOG_INFO("LBS write LED state %d", button_action);
             }
             break;
 
@@ -588,9 +574,6 @@ static void timer_init(void)
 {
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
-  
-    APP_TIMER_DEF(adv_timer);
-    app_timer_create(&adv_timer, APP_TIMER_MODE_SINGLE_SHOT, adv_timer_event_handler);
 }
 
 
@@ -618,7 +601,7 @@ static void gatt_init(void)
  */
 static void idle_state_handle(void)
 {
-    NRF_LOG_FINAL_FLUSH();
+    //NRF_LOG_FINAL_FLUSH();
     nrf_pwr_mgmt_run();
 }
 
@@ -635,16 +618,19 @@ int main(void)
     gatt_init();
     db_discovery_init();
     lbs_c_init();
-    advertising_init();
+    for(int i=0; i<MAX_DEVICES_SUPPORTED; i++)
+    {
+        memset(devices_found[i].addr, 0, 6);
+        devices_found[i].rssi = 0x80; 
+    }
+  
+    ping_advertising_init();
 
     // Start execution.
     NRF_LOG_INFO("Doggy Trax Beacon Started.");
+    
+    //kick off ping/scan and report loop
     advertising_start();
-    app_timer_start(&adv_timer, APP_TIMER_TICKS(450), NULL);
-    scan_start();
-
-    // Turn on the LED to signal scanning.
-    bsp_board_led_on(CENTRAL_SCANNING_LED);
 
     // Enter main loop.
     for (;;)

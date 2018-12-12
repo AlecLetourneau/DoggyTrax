@@ -41,7 +41,6 @@
 .\_build\ble_db_discovery.o: ..\..\..\..\..\..\components\ble\common\ble_srv_common.h
 .\_build\ble_db_discovery.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log.h
 .\_build\ble_db_discovery.o: ..\..\..\..\..\..\components\libraries\experimental_section_vars\nrf_section.h
-.\_build\ble_db_discovery.o: ..\..\..\..\..\..\components\libraries\strerror\nrf_strerror.h
 .\_build\ble_db_discovery.o: ..\..\..\..\..\..\components\libraries\experimental_log\src\nrf_log_internal.h
 .\_build\ble_db_discovery.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_instance.h
 .\_build\ble_db_discovery.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_types.h

@@ -35,7 +35,6 @@
 .\_build\nrf_sdh_soc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 .\_build\nrf_sdh_soc.o: ..\..\..\..\..\..\components\libraries\util\app_error_weak.h
 .\_build\nrf_sdh_soc.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log.h
-.\_build\nrf_sdh_soc.o: ..\..\..\..\..\..\components\libraries\strerror\nrf_strerror.h
 .\_build\nrf_sdh_soc.o: ..\..\..\..\..\..\components\libraries\experimental_log\src\nrf_log_internal.h
 .\_build\nrf_sdh_soc.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_instance.h
 .\_build\nrf_sdh_soc.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_types.h

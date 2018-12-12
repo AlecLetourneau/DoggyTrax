@@ -37,5 +37,4 @@
 .\_build\nrf_balloc.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_instance.h
 .\_build\nrf_balloc.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log_types.h
 .\_build\nrf_balloc.o: ..\..\..\..\..\..\components\libraries\experimental_log\nrf_log.h
-.\_build\nrf_balloc.o: ..\..\..\..\..\..\components\libraries\strerror\nrf_strerror.h
 .\_build\nrf_balloc.o: ..\..\..\..\..\..\components\libraries\experimental_log\src\nrf_log_internal.h
